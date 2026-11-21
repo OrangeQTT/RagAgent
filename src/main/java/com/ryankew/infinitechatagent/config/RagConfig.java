@@ -8,6 +8,7 @@ import com.ryankew.infinitechatagent.rag.splitter.MarkdownHeadingSplitter;
 import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.document.splitter.DocumentSplitters;
 import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.data.segment.TextSegmentTransformer;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.scoring.ScoringModel;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
@@ -59,22 +60,35 @@ public class RagConfig {
     private double rerankMinScore;
 
 
+    /**
+     * RAG 切片器：按三级标题切块，超长块再递归切成 1000 字左右。
+     * 独立成 Bean，启动灌库和 /api/insert 共用同一套切分规则。
+     */
     @Bean
-    public EmbeddingStoreIngestor embeddingStoreIngestor() {
-
+    public DocumentSplitter ragDocumentSplitter() {
         DocumentSplitter subSplitter = DocumentSplitters.recursive(1000, 100);
+        return new MarkdownHeadingSplitter(3, 1500, subSplitter);
+    }
 
-        // DocumentByParagraphSplitter paragraphSplitter = new DocumentByParagraphSplitter(300, 100);
+    /**
+     * 给每个切片前置文件名，便于检索结果保留来源信息。
+     */
+    @Bean
+    public TextSegmentTransformer ragTextSegmentTransformer() {
+        return textSegment -> TextSegment.from(
+                textSegment.metadata().getString("file_name") + "\n" + textSegment.text(),
+                textSegment.metadata()
+        );
+    }
 
-        DocumentSplitter splitter = new MarkdownHeadingSplitter(3, 1500, subSplitter);
+    @Bean
+    public EmbeddingStoreIngestor embeddingStoreIngestor(
+            DocumentSplitter ragDocumentSplitter,
+            TextSegmentTransformer ragTextSegmentTransformer) {
 
         return EmbeddingStoreIngestor.builder()
-                .documentSplitter(splitter)
-                .textSegmentTransformer(textSegment -> TextSegment.from(
-                        textSegment.metadata().getString("file_name") + "\n" + textSegment.text(),
-                        textSegment.metadata()
-                ))
-
+                .documentSplitter(ragDocumentSplitter)
+                .textSegmentTransformer(ragTextSegmentTransformer)
                 .embeddingModel(embeddingModel)
                 .embeddingStore(embeddingStore)
                 .build();
