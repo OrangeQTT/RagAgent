@@ -65,3 +65,8 @@ rag:
   rerank-top-k: 5
   # 精排相关性阈值：qwen3-rerank 分数范围 0~1，低于它的候选直接丢弃
   rerank-min-score: 0.2
+  # 启动灌库时每批向量化的切片数（text-embedding-v4 单次最多 10 条）
+  embedding-batch-size: 10
+  # 单批 embedding 的最大尝试次数（含首次）与重试间隔
+  embedding-max-attempts: 3
+  embedding-retry-delay-ms: 2000
